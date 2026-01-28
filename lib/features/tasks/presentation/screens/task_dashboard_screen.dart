@@ -41,7 +41,7 @@ class TaskDashboardScreen extends ConsumerWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Failed to create task: ${e.toString()}',
+                'Failed to create task: ${e.toString().replaceAll('Exception: ', '')}',
                 style: GoogleFonts.poppins(),
               ),
               backgroundColor: Colors.red.shade700,
@@ -89,7 +89,7 @@ class TaskDashboardScreen extends ConsumerWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Failed to update task: ${e.toString()}',
+                'Failed to update task: ${e.toString().replaceAll('Exception: ', '')}',
                 style: GoogleFonts.poppins(),
               ),
               backgroundColor: Colors.red.shade700,
@@ -113,7 +113,7 @@ class TaskDashboardScreen extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Failed to toggle task: ${e.toString()}',
+              'Failed to toggle task: ${e.toString().replaceAll('Exception: ', '')}',
               style: GoogleFonts.poppins(),
             ),
             backgroundColor: Colors.red.shade700,
@@ -149,7 +149,7 @@ class TaskDashboardScreen extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Failed to delete task: ${e.toString()}',
+              'Failed to delete task: ${e.toString().replaceAll('Exception: ', '')}',
               style: GoogleFonts.poppins(),
             ),
             backgroundColor: Colors.red.shade700,

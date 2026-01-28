@@ -1,112 +1,183 @@
-import 'package:task_app/core/network/api_client.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:task_app/features/tasks/domain/models/task_model.dart';
 
 class TaskRepository {
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
 
+  TaskRepository({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance;
 
-  // Mock tasks database (simulating backend)
-  static final List<TaskModel> _mockTasks = [];
-  static int _taskIdCounter = 1;
-
-  TaskRepository({ApiClient? apiClient});
+  // Helper to get the current user's task collection
+  CollectionReference<Map<String, dynamic>> get _tasksCollection {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception('User not authenticated');
+    }
+    return _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('tasks');
+  }
 
   /// Get all tasks
-  /// In production, this would call GET /tasks
   Future<List<TaskModel>> getTasks() async {
-    // Simulate API delay
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final snapshot = await _tasksCollection
+          .orderBy('createdAt', descending: true)
+          .get();
 
-    // Return copy of tasks list (sorted by creation date, newest first)
-    return List<TaskModel>.from(_mockTasks)
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return TaskModel(
+          id: doc.id,
+          title: data['title'] ?? '',
+          description: data['description'] ?? '',
+          isCompleted: data['isCompleted'] ?? false,
+          createdAt: (data['createdAt'] as Timestamp).toDate(),
+          updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+        );
+      }).toList();
+    } on FirebaseException catch (e) {
+      throw Exception(_getFriendlyErrorMessage(e));
+    } catch (e) {
+      throw Exception('Failed to fetch tasks: $e');
+    }
   }
 
   /// Create a new task
-  /// In production, this would call POST /tasks
   Future<TaskModel> createTask(String title, String description) async {
-    // Simulate API delay
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      final now = DateTime.now();
+      final taskData = {
+        'title': title,
+        'description': description,
+        'isCompleted': false,
+        'createdAt': Timestamp.fromDate(now),
+        'updatedAt': Timestamp.fromDate(now),
+      };
 
-    final task = TaskModel(
-      id: (_taskIdCounter++).toString(),
-      title: title,
-      description: description,
-      isCompleted: false,
-      createdAt: DateTime.now(),
-    );
+      final docRef = await _tasksCollection.add(taskData);
 
-    _mockTasks.add(task);
-    return task;
+      return TaskModel(
+        id: docRef.id,
+        title: title,
+        description: description,
+        isCompleted: false,
+        createdAt: now,
+        updatedAt: now,
+      );
+    } on FirebaseException catch (e) {
+      throw Exception(_getFriendlyErrorMessage(e));
+    } catch (e) {
+      throw Exception('Failed to create task: $e');
+    }
   }
 
   /// Update an existing task
-  /// In production, this would call PUT /tasks/:id
   Future<TaskModel> updateTask(
     String id,
     String title,
     String description,
   ) async {
-    // Simulate API delay
-    await Future.delayed(const Duration(milliseconds: 600));
+    try {
+      final now = DateTime.now();
+      final updates = {
+        'title': title,
+        'description': description,
+        'updatedAt': Timestamp.fromDate(now),
+      };
 
-    final index = _mockTasks.indexWhere((task) => task.id == id);
-    if (index == -1) {
-      throw Exception('Task not found');
+      await _tasksCollection.doc(id).update(updates);
+      return (await getTaskById(id))!; 
+    } on FirebaseException catch (e) {
+      throw Exception(_getFriendlyErrorMessage(e));
+    } catch (e) {
+      throw Exception('Failed to update task: $e');
     }
-
-    final updatedTask = _mockTasks[index].copyWith(
-      title: title,
-      description: description,
-      updatedAt: DateTime.now(),
-    );
-
-    _mockTasks[index] = updatedTask;
-    return updatedTask;
   }
 
   /// Delete a task
-  /// In production, this would call DELETE /tasks/:id
   Future<void> deleteTask(String id) async {
-    // Simulate API delay
-    await Future.delayed(const Duration(milliseconds: 400));
-
-    final index = _mockTasks.indexWhere((task) => task.id == id);
-    if (index == -1) {
-      throw Exception('Task not found');
+    try {
+      await _tasksCollection.doc(id).delete();
+    } on FirebaseException catch (e) {
+      throw Exception(_getFriendlyErrorMessage(e));
+    } catch (e) {
+      throw Exception('Failed to delete task: $e');
     }
-
-    _mockTasks.removeAt(index);
   }
 
   /// Toggle task completion status
-  /// In production, this would call PATCH /tasks/:id
   Future<TaskModel> toggleTaskStatus(String id) async {
-    // Simulate API delay
-    await Future.delayed(const Duration(milliseconds: 400));
+    try {
+      final docRef = _tasksCollection.doc(id);
+      
+      return await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(docRef);
+        
+        if (!snapshot.exists) {
+          throw Exception('Task not found');
+        }
 
-    final index = _mockTasks.indexWhere((task) => task.id == id);
-    if (index == -1) {
-      throw Exception('Task not found');
+        final data = snapshot.data()!;
+        final currentStatus = data['isCompleted'] as bool? ?? false;
+        final newStatus = !currentStatus;
+        final now = DateTime.now();
+
+        transaction.update(docRef, {
+          'isCompleted': newStatus,
+          'updatedAt': Timestamp.fromDate(now),
+        });
+
+        return TaskModel(
+          id: id,
+          title: data['title'] ?? '',
+          description: data['description'] ?? '',
+          isCompleted: newStatus,
+          createdAt: (data['createdAt'] as Timestamp).toDate(),
+          updatedAt: now,
+        );
+      });
+    } on FirebaseException catch (e) {
+      throw Exception(_getFriendlyErrorMessage(e));
+    } catch (e) {
+      throw Exception('Failed to toggle task: $e');
     }
-
-    final updatedTask = _mockTasks[index].copyWith(
-      isCompleted: !_mockTasks[index].isCompleted,
-      updatedAt: DateTime.now(),
-    );
-
-    _mockTasks[index] = updatedTask;
-    return updatedTask;
   }
 
   /// Get a single task by ID
   Future<TaskModel?> getTaskById(String id) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-
     try {
-      return _mockTasks.firstWhere((task) => task.id == id);
-    } catch (_) {
+      final doc = await _tasksCollection.doc(id).get();
+      if (!doc.exists) return null;
+
+      final data = doc.data()!;
+      return TaskModel(
+        id: doc.id,
+        title: data['title'] ?? '',
+        description: data['description'] ?? '',
+        isCompleted: data['isCompleted'] ?? false,
+        createdAt: (data['createdAt'] as Timestamp).toDate(),
+        updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      );
+    } catch (e) {
       return null;
     }
+  }
+
+  String _getFriendlyErrorMessage(FirebaseException e) {
+    if (e.code == 'permission-denied') {
+      return 'Access denied: You do not have permission to access this data.';
+    } else if (e.code == 'unavailable') {
+      return 'Service unavailable: Please check your internet connection.';
+    } else if (e.code == 'not-found') {
+      return 'Data not found.';
+    }
+    return e.message ?? 'An unexpected error occurred.';
   }
 }
