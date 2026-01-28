@@ -4,7 +4,7 @@ import 'package:task_app/core/network/api_client.dart';
 import 'package:task_app/core/utils/secure_storage_service.dart';
 import 'package:task_app/features/auth/data/dtos/auth_dto.dart';
 import 'package:task_app/features/auth/domain/models/user_model.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 
 
 class AuthRepository {
@@ -108,6 +108,9 @@ class AuthRepository {
         refreshToken: updatedUser.uid,
       );
     } on FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
+        throw Exception('Email already registered');
+      }
       throw Exception(e.message ?? 'Registration failed');
     } catch (e) {
       throw Exception('Registration failed: $e');
@@ -125,6 +128,9 @@ class AuthRepository {
 
     try {
       final idToken = await user.getIdToken(true); // true forces refresh
+      if (idToken == null) {
+        throw Exception('Failed to get access token');
+      }
       
       await _storage.saveAccessToken(idToken);
       
