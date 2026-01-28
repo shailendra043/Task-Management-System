@@ -105,9 +105,10 @@ class TaskDashboardScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     String taskId,
+    bool currentStatus,
   ) async {
     try {
-      await ref.read(tasksProvider.notifier).toggleTaskStatus(taskId);
+      await ref.read(tasksProvider.notifier).toggleTaskStatus(taskId, currentStatus);
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -376,7 +377,7 @@ class TaskDashboardScreen extends ConsumerWidget {
                       final task = tasks[index];
                       return TaskCardWidget(
                         task: task,
-                        onToggle: () => _handleToggleTask(context, ref, task.id),
+                        onToggle: () => _handleToggleTask(context, ref, task.id, task.isCompleted),
                         onEdit: () => _handleEditTask(context, ref, task),
                         onDelete: () => _handleDeleteTask(context, ref, task.id),
                       );

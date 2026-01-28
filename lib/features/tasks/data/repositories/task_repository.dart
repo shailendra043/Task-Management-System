@@ -119,35 +119,12 @@ class TaskRepository {
   }
 
   /// Toggle task completion status
-  Future<TaskModel> toggleTaskStatus(String id) async {
+  Future<void> toggleTaskStatus(String id, bool currentStatus) async {
     try {
-      final docRef = _tasksCollection.doc(id);
-      
-      return await _firestore.runTransaction((transaction) async {
-        final snapshot = await transaction.get(docRef);
-        
-        if (!snapshot.exists) {
-          throw Exception('Task not found');
-        }
-
-        final data = snapshot.data()!;
-        final currentStatus = data['isCompleted'] as bool? ?? false;
-        final newStatus = !currentStatus;
-        final now = DateTime.now();
-
-        transaction.update(docRef, {
-          'isCompleted': newStatus,
-          'updatedAt': Timestamp.fromDate(now),
-        });
-
-        return TaskModel(
-          id: id,
-          title: data['title'] ?? '',
-          description: data['description'] ?? '',
-          isCompleted: newStatus,
-          createdAt: (data['createdAt'] as Timestamp).toDate(),
-          updatedAt: now,
-        );
+      final now = DateTime.now();
+      await _tasksCollection.doc(id).update({
+        'isCompleted': !currentStatus,
+        'updatedAt': Timestamp.fromDate(now),
       });
     } on FirebaseException catch (e) {
       throw Exception(_getFriendlyErrorMessage(e));

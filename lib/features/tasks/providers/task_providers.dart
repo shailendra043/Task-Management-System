@@ -120,9 +120,9 @@ class TasksNotifier extends StateNotifier<AsyncValue<List<TaskModel>>> {
   }
 
   // Toggle task completion status
-  Future<void> toggleTaskStatus(String id) async {
+  Future<void> toggleTaskStatus(String id, bool currentStatus) async {
     try {
-      await _repository.toggleTaskStatus(id);
+      await _repository.toggleTaskStatus(id, currentStatus);
     } catch (error) {
       rethrow;
     }
