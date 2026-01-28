@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:task_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:task_app/features/auth/providers/auth_providers.dart';
 import 'package:task_app/features/tasks/presentation/screens/task_dashboard_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
   runApp(
     // Wrap app with ProviderScope for Riverpod
     const ProviderScope(
