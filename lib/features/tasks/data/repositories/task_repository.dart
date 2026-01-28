@@ -24,28 +24,34 @@ class TaskRepository {
         .collection('tasks');
   }
 
-  /// Get all tasks
-  Future<List<TaskModel>> getTasks() async {
+  /// Get all tasks stream
+  Stream<List<TaskModel>> getTasksStream() {
     try {
-      final snapshot = await _tasksCollection
+      return _tasksCollection
           .orderBy('createdAt', descending: true)
-          .get();
-
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return TaskModel(
-          id: doc.id,
-          title: data['title'] ?? '',
-          description: data['description'] ?? '',
-          isCompleted: data['isCompleted'] ?? false,
-          createdAt: (data['createdAt'] as Timestamp).toDate(),
-          updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
-        );
-      }).toList();
+          .snapshots()
+          .map((snapshot) {
+        return snapshot.docs.map((doc) {
+          final data = doc.data();
+          try {
+            return TaskModel(
+              id: doc.id,
+              title: data['title'] ?? '',
+              description: data['description'] ?? '',
+              isCompleted: data['isCompleted'] ?? false,
+              createdAt: (data['createdAt'] as Timestamp).toDate(),
+              updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+            );
+          } catch (e) {
+            // Skip malformed documents instead of crashing entire stream
+            return null;
+          }
+        }).whereType<TaskModel>().toList(); // Filter out nulls
+      });
     } on FirebaseException catch (e) {
       throw Exception(_getFriendlyErrorMessage(e));
     } catch (e) {
-      throw Exception('Failed to fetch tasks: $e');
+      throw Exception('Failed to fetch tasks stream: $e');
     }
   }
 

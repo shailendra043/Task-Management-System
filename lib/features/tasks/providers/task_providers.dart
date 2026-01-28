@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:task_app/features/tasks/data/repositories/task_repository.dart';
 import 'package:task_app/features/tasks/domain/models/task_model.dart';
 
+import 'package:task_app/features/auth/providers/auth_providers.dart';
+
 // Task Repository Provider
 final taskRepositoryProvider = Provider<TaskRepository>((ref) {
   return TaskRepository();
@@ -9,7 +11,10 @@ final taskRepositoryProvider = Provider<TaskRepository>((ref) {
 
 // Tasks List Provider (AsyncValue for loading states)
 final tasksProvider =
-    StateNotifierProvider<TasksNotifier, AsyncValue<List<TaskModel>>>((ref) {
+    StateNotifierProvider.autoDispose<TasksNotifier, AsyncValue<List<TaskModel>>>((ref) {
+  // Watch auth state to rebuild when user changes
+  ref.watch(authStateProvider);
+  
   final repository = ref.watch(taskRepositoryProvider);
   return TasksNotifier(repository);
 });
@@ -50,30 +55,47 @@ final filteredTasksProvider = Provider<AsyncValue<List<TaskModel>>>((ref) {
 // Tasks Notifier
 class TasksNotifier extends StateNotifier<AsyncValue<List<TaskModel>>> {
   final TaskRepository _repository;
+  StreamSubscription<List<TaskModel>>? _tasksSubscription;
 
   TasksNotifier(this._repository) : super(const AsyncValue.loading()) {
-    loadTasks();
+    _init();
   }
 
-  // Load all tasks
-  Future<void> loadTasks() async {
-    state = const AsyncValue.loading();
+  void _init() {
     try {
-      final tasks = await _repository.getTasks();
-      state = AsyncValue.data(tasks);
-    } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
+      _tasksSubscription = _repository.getTasksStream().listen(
+        (tasks) {
+          state = AsyncValue.data(tasks);
+        },
+        onError: (error) {
+          state = AsyncValue.error(error, StackTrace.current);
+        },
+      );
+    } catch (e) {
+      state = AsyncValue.error(e, StackTrace.current);
     }
   }
 
+  @override
+  void dispose() {
+    _tasksSubscription?.cancel();
+    super.dispose();
+  }
+
+  // Reload/Refresh is now automatic via Stream, 
+  // but we keep this for manual triggers if needed (e.g. error retry)
+  Future<void> loadTasks() async {
+     // Re-initialize stream if needed
+     await _tasksSubscription?.cancel();
+     _init();
+  }
+  
   // Create new task
   Future<void> createTask(String title, String description) async {
     try {
       await _repository.createTask(title, description);
-      // Reload tasks after creation
-      await loadTasks();
+      // No need to reload, stream updates automatically
     } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
       rethrow;
     }
   }
@@ -82,10 +104,7 @@ class TasksNotifier extends StateNotifier<AsyncValue<List<TaskModel>>> {
   Future<void> updateTask(String id, String title, String description) async {
     try {
       await _repository.updateTask(id, title, description);
-      // Reload tasks after update
-      await loadTasks();
     } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
       rethrow;
     }
   }
@@ -94,10 +113,7 @@ class TasksNotifier extends StateNotifier<AsyncValue<List<TaskModel>>> {
   Future<void> deleteTask(String id) async {
     try {
       await _repository.deleteTask(id);
-      // Reload tasks after deletion
-      await loadTasks();
     } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
       rethrow;
     }
   }
@@ -106,10 +122,7 @@ class TasksNotifier extends StateNotifier<AsyncValue<List<TaskModel>>> {
   Future<void> toggleTaskStatus(String id) async {
     try {
       await _repository.toggleTaskStatus(id);
-      // Reload tasks after toggling
-      await loadTasks();
     } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
       rethrow;
     }
   }
