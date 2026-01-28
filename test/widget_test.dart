@@ -4,11 +4,38 @@ import 'package:task_app/features/auth/data/repositories/auth_repository.dart';
 import 'package:task_app/features/auth/providers/auth_providers.dart';
 import 'package:task_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:task_app/main.dart';
+import 'package:task_app/features/auth/data/dtos/auth_dto.dart';
+import 'package:task_app/features/auth/domain/models/user_model.dart';
 
-class FakeAuthRepository extends AuthRepository {
+class FakeAuthRepository implements AuthRepository {
   @override
   Future<bool> isLoggedIn() async {
     return false;
+  }
+
+  @override
+  Future<AuthResponseDto> login(String email, String password) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AuthResponseDto> register(String name, String email, String password) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<RefreshTokenResponseDto> refreshToken() async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<UserModel?> getCurrentUser() async {
+    return null;
+  }
+
+  @override
+  Future<void> logout() async {
+    return;
   }
 }
 
