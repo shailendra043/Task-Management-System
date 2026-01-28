@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:task_app/features/tasks/data/repositories/task_repository.dart';
 import 'package:task_app/features/tasks/domain/models/task_model.dart';
@@ -95,7 +96,7 @@ class TasksNotifier extends StateNotifier<AsyncValue<List<TaskModel>>> {
     try {
       await _repository.createTask(title, description);
       // No need to reload, stream updates automatically
-    } catch (error, stackTrace) {
+    } catch (error) {
       rethrow;
     }
   }
@@ -104,7 +105,7 @@ class TasksNotifier extends StateNotifier<AsyncValue<List<TaskModel>>> {
   Future<void> updateTask(String id, String title, String description) async {
     try {
       await _repository.updateTask(id, title, description);
-    } catch (error, stackTrace) {
+    } catch (error) {
       rethrow;
     }
   }
@@ -113,7 +114,7 @@ class TasksNotifier extends StateNotifier<AsyncValue<List<TaskModel>>> {
   Future<void> deleteTask(String id) async {
     try {
       await _repository.deleteTask(id);
-    } catch (error, stackTrace) {
+    } catch (error) {
       rethrow;
     }
   }
@@ -122,7 +123,7 @@ class TasksNotifier extends StateNotifier<AsyncValue<List<TaskModel>>> {
   Future<void> toggleTaskStatus(String id) async {
     try {
       await _repository.toggleTaskStatus(id);
-    } catch (error, stackTrace) {
+    } catch (error) {
       rethrow;
     }
   }
