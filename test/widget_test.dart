@@ -1,25 +1,25 @@
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:task_app/main.dart';
+import 'package:task_app/features/auth/data/repositories/auth_repository.dart';
+import 'package:task_app/features/auth/providers/auth_providers.dart';
 import 'package:task_app/features/auth/presentation/screens/login_screen.dart';
+import 'package:task_app/main.dart';
+
+class FakeAuthRepository extends AuthRepository {
+  @override
+  Future<bool> isLoggedIn() async {
+    return false;
+  }
+}
 
 void main() {
   testWidgets('App starts with Login Screen', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    // Note: MyApp already includes ProviderScope, but for tests we often wrap it again
-    // or we can just pump MyApp if it has the scope. In main.dart, main() wraps it.
-    // MyApp itself is a ConsumerWidget.
-    
-    // We need to wrap it here because MyApp expects to be in a ProviderScope 
-    // (actually in main.dart we wrapped MyApp in ProviderScope, but MyApp itself doesn't include it in its build method)
-    // Wait, let's check main.dart.
-    // main() { runApp(ProviderScope(child: MyApp())); }
-    // MyApp build() ...
-    
     await tester.pumpWidget(
-      const ProviderScope(
-        child: MyApp(),
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
+        ],
+        child: const MyApp(),
       ),
     );
 
@@ -28,6 +28,6 @@ void main() {
 
     // Verify that Login Screen is present
     expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.text('Task Manager'), findsOneWidget); // Logo text
+    expect(find.text('Task Manager'), findsOneWidget);
   });
 }
