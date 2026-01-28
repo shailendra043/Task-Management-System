@@ -1,143 +1,155 @@
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:task_app/core/network/api_client.dart';
 import 'package:task_app/core/utils/secure_storage_service.dart';
 import 'package:task_app/features/auth/data/dtos/auth_dto.dart';
 import 'package:task_app/features/auth/domain/models/user_model.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 
 class AuthRepository {
 
   final SecureStorageService _storage;
-
-  // Mock users database (simulating backend)
-  static final List<Map<String, dynamic>> _mockUsers = [];
-  static int _userIdCounter = 1;
+  final FirebaseAuth _firebaseAuth;
 
   AuthRepository({
     ApiClient? apiClient,
     SecureStorageService? storage,
-  })  : _storage = storage ?? SecureStorageService();
+    FirebaseAuth? firebaseAuth,
+  })  : _storage = storage ?? SecureStorageService(),
+        _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance;
 
   /// Login with email and password
-  /// In production, this would call the API endpoint
-  /// For now, we use mock data
   Future<AuthResponseDto> login(String email, String password) async {
-    // Simulate API delay
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      
+      final user = userCredential.user;
+      if (user == null) {
+        throw Exception('Login failed: User is null');
+      }
 
-    // Find user in mock database
-    final userMap = _mockUsers.firstWhere(
-      (user) => user['email'] == email && user['password'] == password,
-      orElse: () => throw Exception('Invalid email or password'),
-    );
+      final idToken = await user.getIdToken();
+      if (idToken == null) {
+        throw Exception('Login failed: Failed to get access token');
+      }
 
-    // Create user model
-    final user = UserModel(
-      id: userMap['id'].toString(),
-      name: userMap['name'],
-      email: userMap['email'],
-      createdAt: DateTime.parse(userMap['createdAt']),
-    );
+      // Convert Firebase User to UserModel
+      final userModel = UserModel(
+        id: user.uid,
+        name: user.displayName ?? 'User', // Fallback name
+        email: user.email ?? email,
+        createdAt: user.metadata.creationTime ?? DateTime.now(),
+      );
 
-    // Generate mock tokens
-    final accessToken = _generateMockToken(user.id);
-    final refreshToken = _generateMockToken(user.id, isRefresh: true);
+      // Store tokens and user data
+      await _storage.saveAccessToken(idToken);
+      // Firebase handles refresh token internally, but we can store the uid for persistence check
+      await _storage.saveRefreshToken(user.uid); 
+      await _storage.saveUserData(jsonEncode(userModel.toJson()));
 
-    // Store tokens
-    await _storage.saveAccessToken(accessToken);
-    await _storage.saveRefreshToken(refreshToken);
-    await _storage.saveUserData(jsonEncode(user.toJson()));
-
-    return AuthResponseDto(
-      user: user,
-      accessToken: accessToken,
-      refreshToken: refreshToken,
-    );
+      return AuthResponseDto(
+        user: userModel,
+        accessToken: idToken,
+        refreshToken: user.uid, // Using uid as pseudo-refresh token for local consistency
+      );
+    } on FirebaseAuthException catch (e) {
+      throw Exception(e.message ?? 'Login failed');
+    } catch (e) {
+      throw Exception('Login failed: $e');
+    }
   }
 
   /// Register new user
-  /// In production, this would call the API endpoint
   Future<AuthResponseDto> register(
     String name,
     String email,
     String password,
   ) async {
-    // Simulate API delay
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-    // Check if email already exists
-    final exists = _mockUsers.any((user) => user['email'] == email);
-    if (exists) {
-      throw Exception('Email already registered');
+      final user = userCredential.user;
+      if (user == null) {
+        throw Exception('Registration failed: User is null');
+      }
+
+      // Update display name
+      await user.updateDisplayName(name);
+      await user.reload(); // Reload to get updated data
+      final updatedUser = _firebaseAuth.currentUser; 
+
+      final idToken = await updatedUser?.getIdToken();
+      if (idToken == null) {
+         throw Exception('Registration failed: Failed to get access token');
+      }
+
+      final userModel = UserModel(
+        id: updatedUser!.uid,
+        name: name,
+        email: updatedUser.email ?? email,
+        createdAt: updatedUser.metadata.creationTime ?? DateTime.now(),
+      );
+
+      // Store tokens
+      await _storage.saveAccessToken(idToken);
+      await _storage.saveRefreshToken(updatedUser.uid);
+      await _storage.saveUserData(jsonEncode(userModel.toJson()));
+
+      return AuthResponseDto(
+        user: userModel,
+        accessToken: idToken,
+        refreshToken: updatedUser.uid,
+      );
+    } on FirebaseAuthException catch (e) {
+      throw Exception(e.message ?? 'Registration failed');
+    } catch (e) {
+      throw Exception('Registration failed: $e');
     }
-
-    // Create new user
-    final userId = _userIdCounter++;
-    final userMap = {
-      'id': userId,
-      'name': name,
-      'email': email,
-      'password': password,
-      'createdAt': DateTime.now().toIso8601String(),
-    };
-    _mockUsers.add(userMap);
-
-    // Create user model
-    final user = UserModel(
-      id: userId.toString(),
-      name: name,
-      email: email,
-      createdAt: DateTime.now(),
-    );
-
-    // Generate mock tokens
-    final accessToken = _generateMockToken(user.id);
-    final refreshToken = _generateMockToken(user.id, isRefresh: true);
-
-    // Store tokens
-    await _storage.saveAccessToken(accessToken);
-    await _storage.saveRefreshToken(refreshToken);
-    await _storage.saveUserData(jsonEncode(user.toJson()));
-
-    return AuthResponseDto(
-      user: user,
-      accessToken: accessToken,
-      refreshToken: refreshToken,
-    );
   }
 
   /// Refresh access token using refresh token
   Future<RefreshTokenResponseDto> refreshToken() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    final refreshToken = await _storage.getRefreshToken();
-    if (refreshToken == null) {
-      throw Exception('No refresh token available');
+    // Firebase automatically handles token refresh. 
+    // We get the current user and force a token refresh.
+    final user = _firebaseAuth.currentUser;
+    if (user == null) {
+      throw Exception('No user currently logged in');
     }
 
-    // In production, validate refresh token with backend
-    // For now, generate new tokens
-    final userDataStr = await _storage.getUserData();
-    if (userDataStr == null) {
-      throw Exception('User data not found');
+    try {
+      final idToken = await user.getIdToken(true); // true forces refresh
+      
+      await _storage.saveAccessToken(idToken);
+      
+      return RefreshTokenResponseDto(
+        accessToken: idToken,
+        refreshToken: user.uid,
+      );
+    } catch (e) {
+      throw Exception('Failed to refresh token: $e');
     }
-
-    final userData = jsonDecode(userDataStr);
-    final userId = userData['id'].toString();
-
-    final newAccessToken = _generateMockToken(userId);
-    final newRefreshToken = _generateMockToken(userId, isRefresh: true);
-
-    await _storage.saveAccessToken(newAccessToken);
-    await _storage.saveRefreshToken(newRefreshToken);
-
-    return RefreshTokenResponseDto(
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
-    );
   }
 
-  /// Get current user from storage
+  /// Get current user from storage or Firebase
   Future<UserModel?> getCurrentUser() async {
+    final user = _firebaseAuth.currentUser;
+    if (user != null) {
+       return UserModel(
+        id: user.uid,
+        name: user.displayName ?? 'User',
+        email: user.email ?? '',
+        createdAt: user.metadata.creationTime ?? DateTime.now(),
+      );
+    }
+    
+    // Fallback to storage if needed, but Firebase is source of truth
     final userDataStr = await _storage.getUserData();
     if (userDataStr == null) return null;
 
@@ -151,18 +163,12 @@ class AuthRepository {
 
   /// Check if user is logged in
   Future<bool> isLoggedIn() async {
-    return await _storage.isLoggedIn();
+    return _firebaseAuth.currentUser != null;
   }
 
   /// Logout - clear all stored data
   Future<void> logout() async {
+    await _firebaseAuth.signOut();
     await _storage.clearAll();
-  }
-
-  /// Generate mock JWT-like token
-  String _generateMockToken(String userId, {bool isRefresh = false}) {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final type = isRefresh ? 'refresh' : 'access';
-    return 'mock_${type}_token_${userId}_$timestamp';
   }
 }
