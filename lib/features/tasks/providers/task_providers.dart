@@ -38,7 +38,6 @@ final filteredTasksProvider = Provider<AsyncValue<List<TaskModel>>>((ref) {
           filtered = taskList.where((task) => !task.isCompleted).toList();
           break;
         case TaskFilter.all:
-        default:
           filtered = taskList;
       }
       return AsyncValue.data(filtered);

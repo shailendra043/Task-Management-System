@@ -29,7 +29,7 @@ class MyApp extends ConsumerWidget {
         ),
         useMaterial3: true,
         textTheme: GoogleFonts.poppinsTextTheme(),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           elevation: 2,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),

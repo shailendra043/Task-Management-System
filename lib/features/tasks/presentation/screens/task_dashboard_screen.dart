@@ -306,7 +306,7 @@ class TaskDashboardScreen extends ConsumerWidget {
                       Text(
                         'Welcome back,',
                         style: GoogleFonts.poppins(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                           fontSize: 12,
                         ),
                       ),

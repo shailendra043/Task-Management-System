@@ -1,16 +1,15 @@
 import 'package:task_app/core/network/api_client.dart';
-import 'package:task_app/features/tasks/data/dtos/task_dto.dart';
+
 import 'package:task_app/features/tasks/domain/models/task_model.dart';
 
 class TaskRepository {
-  final ApiClient _apiClient;
+
 
   // Mock tasks database (simulating backend)
   static final List<TaskModel> _mockTasks = [];
   static int _taskIdCounter = 1;
 
-  TaskRepository({ApiClient? apiClient})
-      : _apiClient = apiClient ?? ApiClient();
+  TaskRepository({ApiClient? apiClient});
 
   /// Get all tasks
   /// In production, this would call GET /tasks

@@ -29,12 +29,10 @@ class ServerException extends AppException {
 
 // Network/Connection Error
 class NetworkException extends AppException {
-  NetworkException([String message = 'No internet connection. Please check your network.'])
-      : super(message);
+  NetworkException([super.message = 'No internet connection. Please check your network.']);
 }
 
 // Generic Error
 class GenericException extends AppException {
-  GenericException([String message = 'Something went wrong. Please try again.'])
-      : super(message);
+  GenericException([super.message = 'Something went wrong. Please try again.']);
 }

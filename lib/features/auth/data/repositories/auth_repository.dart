@@ -5,7 +5,7 @@ import 'package:task_app/features/auth/data/dtos/auth_dto.dart';
 import 'package:task_app/features/auth/domain/models/user_model.dart';
 
 class AuthRepository {
-  final ApiClient _apiClient;
+
   final SecureStorageService _storage;
 
   // Mock users database (simulating backend)
@@ -15,8 +15,7 @@ class AuthRepository {
   AuthRepository({
     ApiClient? apiClient,
     SecureStorageService? storage,
-  })  : _apiClient = apiClient ?? ApiClient(),
-        _storage = storage ?? SecureStorageService();
+  })  : _storage = storage ?? SecureStorageService();
 
   /// Login with email and password
   /// In production, this would call the API endpoint
